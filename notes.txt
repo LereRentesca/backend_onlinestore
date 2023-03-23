@@ -1,0 +1,12 @@
+# Initialize the Repo (1time)
+git init
+
+# create local snapshot
+git add .
+git commit -m "Something"
+
+#setup the remote
+git remote add origin(name of the repo) "url_from_github"
+
+#push to the repo
+git push -u origin main
