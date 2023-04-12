@@ -1,10 +1,19 @@
-from flask import Flask
+from flask import Flask, request
 import json
 from about import me
-from data import mock_data
+from config import db
 from collections import Counter
+from flask_cors import CORS
 
 app = Flask("__server__") #create instance of flask class
+CORS(app) #WARNING: disable CORS check
+
+###METHODS###
+def fix_id(record):
+    record["_id"]=str(record["_id"])
+    return record;
+
+###GET###
 
 @app.get("/")
 def home():
@@ -25,11 +34,24 @@ def about():
 
 @app.get("/api/catalog")
 def catalog():
-    return json.dumps(mock_data)
+    cursor = db.products.find({})
+    results = []
+    for prod in cursor:
+        results.append(fix_id(prod))
+    return json.dumps(results)
+
+@app.get("/api/coupons")
+def coupons():
+    coupons = db.coupons.find({})
+    results = []
+    for prod in coupons:
+        results.append(fix_id(prod))
+    return json.dumps(results)
 
 @app.get("/api/products/count")
 def total_products():
-    return json.dumps(f'{len(mock_data)}')
+    count = db.products.count_documents({})
+    return json.dumps(count)
 
 @app.get("/api/developer/name")
 def developer_name():
@@ -37,29 +59,81 @@ def developer_name():
 
 @app.get("/api/categories")
 def categories():
-    cat=[];
-    for item in mock_data:
-        if not(cat.count(item['category'])):
-            cat.append(item['category'])
-    # counts = Counter(cat)
-    # cat=list(counts.keys())
-
-    return json.dumps(f'{cat}')
+    cursor = db.products.find({})
+    cats = []
+    for prod in cursor:
+        category = prod["category"]
+        if category not in cats:
+            cats.append(category)
+    return json.dumps(cats)
 
 @app.get("/api/products/total")
 def total_amount():
+    cursor = db.products.find({})
     total=0
-    for item in mock_data:
-        total+=item['price']
+    for prod in cursor:
+        total+=prod['price']
     return json.dumps(f'The total price is: {total}')
+
+@app.get("/api/products/lower/<price>")
+def products_lower(price):
+    fixed_price = float(price)
+    cursor = db.products.find({})
+    results=[]
+    for prod in cursor:
+        if prod["price"]<fixed_price:
+            results.append(fix_id(prod))
+    return json.dumps(results)
+
+@app.get("/api/products/greater/<price>")
+def products_greater(price):
+    fixed_price = float(price)
+    cursor = db.products.find({})
+    results=[]
+    for prod in cursor:
+        if prod["price"] >= fixed_price:
+            results.append(fix_id(prod))
+    return json.dumps(results)
+
+@app.get("/api/products/search/<term>")
+def search(term):
+    cursor = db.products.find({"title":{'$regex':term,"$options":"i"}})
+    data=[]
+    for item in cursor:
+        data.append(fix_id(item))
+    return json.dumps(data)
 
 @app.get("/api/catalog/<category>")
 def products_by_category(category):
-    data=[]
-    for item in mock_data:
-        if(item["category"]==category):
-            data.append(item)
-    return json.dumps(f'{data}')
+    cursor = db.products.find({"category":category})
+    results = []
+    for prod in cursor:
+        results.append(fix_id(prod))
+    return json.dumps(results)
 
+@app.get("/api/coupons/<code>")
+def coupons_by_code(code):
+    cursor = db.coupons.find({"code":code})
+    results = []
+    for coupon in cursor:
+        results.append(fix_id(coupon))
+    return json.dumps(results)
+
+###POST#####
+
+@app.post('/api/catalog')
+def save_product():
+    product = request.get_json()
+    db.products.insert_one(product)
+    print("-------------------------")
+    print(product)
+
+    return json.dumps(fix_id(product))
+
+@app.post('/api/coupons')
+def save_coupon():
+    coupon = request.get_json()
+    db.coupons.insert_one(coupon)
+    return json.dumps(fix_id(coupon))
 
 app.run(debug=True)
